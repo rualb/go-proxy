@@ -1,0 +1,6 @@
+{
+     "http_server":{
+        "cert_dir":"./configs/cert",
+        "cert_hosts":["localhost"]
+     }
+}

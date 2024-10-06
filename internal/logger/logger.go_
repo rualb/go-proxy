@@ -1,0 +1,50 @@
+package logger
+
+import (
+	"go-proxy/internal/config"
+
+	// "context"
+
+	"go.uber.org/zap"
+)
+
+// AppLogger is an alternative implementation of *gorm.AppLogger
+type AppLogger interface {
+	ZapLogger() *zap.SugaredLogger
+}
+
+type logger struct {
+	Zap *zap.SugaredLogger
+}
+
+// NewLogger is constructor for logger
+func NewLogger(sugar *zap.SugaredLogger) AppLogger {
+	return &logger{Zap: sugar}
+}
+
+// InitLogger create logger object for *gorm.DB from *echo.Logger
+func InitLogger(config *config.AppConfig) AppLogger {
+
+	var zapLogger *zap.Logger
+
+	if config.Debug {
+		zapLogger, _ = zap.NewDevelopment()
+
+	} else {
+		zapLogger, _ = zap.NewProduction()
+	}
+
+	zapSugar := zapLogger.Sugar()
+	// set package varriable logger.
+	appLogger := NewLogger(zapSugar)
+
+	appLogger.ZapLogger()
+
+	_ = zapLogger.Sync()
+	return appLogger
+}
+
+// ZapLogger returns zapSugaredLogger
+func (log *logger) ZapLogger() *zap.SugaredLogger {
+	return log.Zap
+}

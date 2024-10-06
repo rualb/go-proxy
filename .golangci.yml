@@ -1,0 +1,44 @@
+
+linters:
+  disable-all: true
+  enable:
+    - staticcheck
+    #- revive
+    - govet
+    - unconvert
+    - unused
+    - gosec
+    - gocyclo
+    - dupl
+    - misspell
+    - unparam
+    - typecheck
+    - ineffassign
+    - stylecheck
+    - gochecknoinits
+    - copyloopvar
+    - gocritic
+    - nakedret
+    - gosimple
+    - prealloc
+  fast: false
+
+issues:
+  exclude-dirs:
+    - test
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gosec
+    - text: "ST1000: at least one file in a package should have a package comment"
+      linters:
+        - stylecheck
+    - text: "ST1020: comment on exported function"
+      linters:
+        - stylecheck
+        
+  exclude-use-default: false
+
+run:
+  timeout: 5m

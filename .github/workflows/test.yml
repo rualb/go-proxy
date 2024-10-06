@@ -1,0 +1,53 @@
+name: test
+
+on:
+  push:
+    branches: []
+    tags: []
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:13  # Use the desired PostgreSQL version (e.g., 13, 14, etc.)
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go 1.23
+      uses: actions/setup-go@v5
+      with:
+        go-version: stable
+        cache: false
+
+    - name: Wait for PostgreSQL to be ready
+      run: |
+        until pg_isready --host=localhost --port=5432 --username=postgres; do
+          echo "Waiting for PostgreSQL..."
+          sleep 1
+        done
+
+    - name: Test
+      env:
+        APP_DB_USER: postgres
+        APP_DB_PASSWORD: postgres
+        APP_DB_NAME: postgres
+        APP_DB_HOST: localhost
+        APP_DB_PORT: 5432
+      run: |
+        echo "Testing..."
+        go test ./...
+

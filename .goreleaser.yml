@@ -1,0 +1,39 @@
+project_name: go-proxy
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - main: ./cmd/go-proxy
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+      - -X main.ShortCommit={{.ShortCommit}}
+      - -X main.Commit={{.Commit}}
+      - -X main.Date={{.CommitDate}}
+    env:
+      - CGO_ENABLED=0
+      - GO111MODULE=on
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - LICENSE
+      - README.md
+      - src: "configs/go-proxy/*"
+        dst: .
+checksum:
+  algorithm: sha256
+  

@@ -1,0 +1,12 @@
+*.test
+*.out
+access.log
+var/
+dist/
+.vscode
+.idea
+*.gpg
+.env
+__*
+*.exe
+VERSION
