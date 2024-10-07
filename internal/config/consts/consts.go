@@ -30,6 +30,7 @@ const (
 // )
 
 const (
+	PathSysMetricsAPI = "/sys/api/metrics"
 	// PathAPITestPing = PathAPITest + "/ping" // no self ping
 
 	// PathTestHealthAPI = "/test/api/health"

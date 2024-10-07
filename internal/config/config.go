@@ -47,8 +47,11 @@ type CmdLineConfig struct {
 	Targets   []string
 	CertHosts []string
 	GeoIPFile string
+
+	SysAPIKey string
 	Listen    string
 	ListenTLS string
+	ListenSys string
 }
 
 const (
@@ -70,6 +73,10 @@ func ReadFlags() {
 	_ = os.Args
 	flag.StringVar(&CmdLine.Config, "config", "", "Path to dir with config files")
 	flag.StringVar(&CmdLine.CertDir, "cert-dir", "", "Path to dir with cert files")
+	flag.StringVar(&CmdLine.SysAPIKey, "sys-api-key", "", "Sys api key")
+	flag.StringVar(&CmdLine.Listen, "listen", "", "Listen")
+	flag.StringVar(&CmdLine.ListenTLS, "listen-tls", "", "Listen TLS")
+	flag.StringVar(&CmdLine.ListenSys, "listen-sys", "", "Listen sys")
 	flag.StringVar(&CmdLine.GeoIPFile, "geo-ip-file", "", "Path to file GeoLite2-Country.mmdb")
 
 	flag.BoolVar(&CmdLine.IsMaint, "is-maint", false, "Maintenance mode")
@@ -84,9 +91,6 @@ func ReadFlags() {
 		CmdLine.CertHosts = append(CmdLine.CertHosts, value)
 		return nil
 	})
-
-	flag.StringVar(&CmdLine.Listen, "listen", "", "Listen")
-	flag.StringVar(&CmdLine.ListenTLS, "listen-tls", "", "Listen TLS")
 
 	flag.BoolVar(&CmdLine.Version, "version", false, "App version")
 
@@ -213,6 +217,10 @@ type AppConfigHTTPServer struct {
 	WriteTimeout      int `json:"write_timeout,omitempty"`       // 10 to 30 seconds, WriteTimeout > ReadTimeout
 	IdleTimeout       int `json:"idle_timeout,omitempty"`        // 60 to 120 seconds
 	ReadHeaderTimeout int `json:"read_header_timeout,omitempty"` // default get from ReadTimeout
+
+	SysMetrics bool   `json:"sys_metrics"` //
+	SysAPIKey  string `json:"sys_api_key"`
+	ListenSys  string `json:"listen_sys"`
 }
 
 type AppConfigMod struct {
@@ -298,6 +306,9 @@ func NewAppConfig() *AppConfig {
 			Listen:    "localhost:80",
 			ListenTLS: "localhost:443",
 			CertDir:   "",
+
+			SysAPIKey: "",
+
 			CertHosts: []string{},
 		},
 	}
@@ -352,13 +363,17 @@ func (x *AppConfig) readEnvVar() error {
 	reader.String(&x.Env, "env", nil)
 	reader.String(&x.Title, "title", nil)
 
-	reader.String(&x.HTTPServer.Listen, "listen", &CmdLine.Listen)
-	reader.String(&x.HTTPServer.ListenTLS, "listen_tls", &CmdLine.ListenTLS)
 	reader.String(&x.HTTPServer.CertDir, "cert_dir", &CmdLine.CertDir)
 
 	reader.String(&x.GeoIP.File, "geo_ip_file", &CmdLine.GeoIPFile)
 
 	reader.Bool(&x.IsMaint, "is_maint", &CmdLine.IsMaint)
+
+	reader.String(&x.HTTPServer.Listen, "listen", &CmdLine.Listen)
+	reader.String(&x.HTTPServer.ListenTLS, "listen_tls", &CmdLine.ListenTLS)
+	reader.String(&x.HTTPServer.ListenSys, "listen_sys", &CmdLine.ListenSys)
+
+	reader.String(&x.HTTPServer.SysAPIKey, "sys_api_key", &CmdLine.SysAPIKey)
 
 	x.Proxy.Targets = append(x.Proxy.Targets, CmdLine.Targets...)
 	x.HTTPServer.CertHosts = append(x.HTTPServer.CertHosts, CmdLine.CertHosts...)
