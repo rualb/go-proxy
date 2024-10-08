@@ -44,14 +44,16 @@ type CmdLineConfig struct {
 	Name      string
 	IsMaint   bool
 	Version   bool
-	Targets   []string
-	CertHosts []string
+	Targets   []string // ["",""]
+	CertHosts []string // ["",""]
 	GeoIPFile string
 
 	SysAPIKey string
 	Listen    string
 	ListenTLS string
 	ListenSys string
+
+	DumpConfig bool
 }
 
 const (
@@ -71,6 +73,7 @@ var CmdLine = CmdLineConfig{}
 func ReadFlags() {
 
 	_ = os.Args
+
 	flag.StringVar(&CmdLine.Config, "config", "", "Path to dir with config files")
 	flag.StringVar(&CmdLine.CertDir, "cert-dir", "", "Path to dir with cert files")
 	flag.StringVar(&CmdLine.SysAPIKey, "sys-api-key", "", "Sys api key")
@@ -83,16 +86,39 @@ func ReadFlags() {
 	flag.StringVar(&CmdLine.Env, "env", "", "Environment: development, testing, staging, production")
 	flag.StringVar(&CmdLine.Name, "name", "", "App name")
 
-	flag.Func("target", "Proxy target as URL", func(value string) error {
+	flag.Func("target", "Proxy target URL", func(value string) error {
 		CmdLine.Targets = append(CmdLine.Targets, value)
 		return nil
 	})
+
+	flag.Func("targets", "Proxy targets URL as json array", func(value string) (err error) {
+		if value != "" {
+			tmp := []string{}
+			if err = json.Unmarshal([]byte(value), &tmp); err != nil {
+				CmdLine.Targets = append(CmdLine.Targets, tmp...)
+			}
+		}
+		return err
+	})
+
 	flag.Func("cert_host", "Define host for TLS", func(value string) error {
 		CmdLine.CertHosts = append(CmdLine.CertHosts, value)
 		return nil
 	})
 
+	flag.Func("cert_hosts", "Define hosts for TLS as json array", func(value string) (err error) {
+		if value != "" {
+			tmp := []string{}
+			if err = json.Unmarshal([]byte(value), &tmp); err != nil {
+				CmdLine.CertHosts = append(CmdLine.CertHosts, tmp...)
+			}
+		}
+		return err
+	})
+
 	flag.BoolVar(&CmdLine.Version, "version", false, "App version")
+
+	flag.BoolVar(&CmdLine.DumpConfig, "dump-config", false, "Dump Config")
 
 	flag.Parse() // dont use from init()
 
@@ -126,7 +152,31 @@ func (x *envReader) String(p *string, name string, cmdValue *string) {
 	}
 
 }
+func (x *envReader) StringArray(p *[]string, name string, cmdValue *[]string) {
+	envName := strings.ToUpper(x.prefix + name) // *nix case-sensitive
+	if len(*cmdValue) > 0 {
+		xlog.Info("Reading %q value from cmd: %v", name, *cmdValue)
+		*p = *cmdValue // error: p = cmdValue
 
+		return
+	}
+
+	if envName != "" {
+		envValue := os.Getenv(envName)
+		if envValue != "" {
+			xlog.Info("Reading %q value from env: %v = %v", name, envName, envValue)
+			tmp := []string{}
+			if err := json.Unmarshal([]byte(envValue), &tmp); err != nil {
+				x.envError = err
+			}
+			if len(tmp) > 0 {
+				*p = tmp // error: p = &tmp
+			}
+			return
+		}
+	}
+
+}
 func (x *envReader) Bool(p *bool, name string, cmdValue *bool) {
 
 	envName := strings.ToUpper(x.prefix + name) // *nix case-sensitive
@@ -375,8 +425,8 @@ func (x *AppConfig) readEnvVar() error {
 
 	reader.String(&x.HTTPServer.SysAPIKey, "sys_api_key", &CmdLine.SysAPIKey)
 
-	x.Proxy.Targets = append(x.Proxy.Targets, CmdLine.Targets...)
-	x.HTTPServer.CertHosts = append(x.HTTPServer.CertHosts, CmdLine.CertHosts...)
+	reader.StringArray(&x.Proxy.Targets, "tragets", &CmdLine.Targets)
+	reader.StringArray(&x.HTTPServer.CertHosts, "cert_hosts", &CmdLine.CertHosts)
 
 	if reader.envError != nil {
 		return reader.envError
@@ -477,9 +527,10 @@ func (x *AppConfigSource) Load() error {
 
 	x.config = res
 
-	// data, _ := json.MarshalIndent(res, "", "\t")
-
-	// toolfile.WriteBytes("./dump.json", data)
+	if CmdLine.DumpConfig {
+		data, _ := json.MarshalIndent(res, "", " ")
+		fmt.Println(string(data))
+	}
 
 	return nil
 }
