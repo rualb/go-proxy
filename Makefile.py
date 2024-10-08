@@ -15,6 +15,7 @@ git tag "$(cat VERSION)"
 git tag (Get-Content VERSION)
 """
 
+
 AppName = "go-proxy"
 
 def test():
