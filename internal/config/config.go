@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"go-proxy/internal/config/consts"
+	"math"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -154,7 +155,7 @@ func (x *envReader) String(p *string, name string, cmdValue *string) {
 }
 func (x *envReader) StringArray(p *[]string, name string, cmdValue *[]string) {
 	envName := strings.ToUpper(x.prefix + name) // *nix case-sensitive
-	if len(*cmdValue) > 0 {
+	if cmdValue != nil && len(*cmdValue) > 0 {
 		xlog.Info("Reading %q value from cmd: %v", name, *cmdValue)
 		*p = *cmdValue // error: p = cmdValue
 
@@ -177,6 +178,7 @@ func (x *envReader) StringArray(p *[]string, name string, cmdValue *[]string) {
 	}
 
 }
+
 func (x *envReader) Bool(p *bool, name string, cmdValue *bool) {
 
 	envName := strings.ToUpper(x.prefix + name) // *nix case-sensitive
@@ -196,6 +198,30 @@ func (x *envReader) Bool(p *bool, name string, cmdValue *bool) {
 	}
 }
 
+func (x *envReader) Float64(p *float64, name string, cmdValue *float64) {
+
+	envName := strings.ToUpper(x.prefix + name) // *nix case-sensitive
+
+	if cmdValue != nil && math.Abs(*cmdValue) > 0.000001 {
+		xlog.Info("Reading float64 %q value from cmd: %v", name, *cmdValue)
+		*p = *cmdValue
+		return
+	}
+	if envName != "" {
+		envValue := os.Getenv(envName)
+		if envValue != "" {
+			xlog.Info("Reading float64 %q value from env: %v = %v", name, envName, envValue)
+
+			if v, err := strconv.ParseFloat(envValue, 64); err == nil {
+				*p = v
+			} else {
+				x.envError = err
+			}
+
+		}
+	}
+
+}
 func (x *envReader) Int(p *int, name string, cmdValue *int) {
 
 	envName := strings.ToUpper(x.prefix + name) // *nix case-sensitive
@@ -261,16 +287,24 @@ type AppConfigHTTPServer struct {
 	RedirectWWW   bool     `json:"redirect_www"`
 	RequestID     bool     `json:"request_id"`
 
-	CertDir string `json:"cert_dir"`
-
-	ReadTimeout       int `json:"read_timeout,omitempty"`        // 5 to 30 seconds
-	WriteTimeout      int `json:"write_timeout,omitempty"`       // 10 to 30 seconds, WriteTimeout > ReadTimeout
-	IdleTimeout       int `json:"idle_timeout,omitempty"`        // 60 to 120 seconds
-	ReadHeaderTimeout int `json:"read_header_timeout,omitempty"` // default get from ReadTimeout
+	CertDir           string `json:"cert_dir"`
+	RequestTimeout    int    `json:"request_timeout,omitempty"`     // 5 to 30 seconds
+	ReadTimeout       int    `json:"read_timeout,omitempty"`        // 5 to 30 seconds
+	WriteTimeout      int    `json:"write_timeout,omitempty"`       // 10 to 30 seconds, WriteTimeout > ReadTimeout
+	IdleTimeout       int    `json:"idle_timeout,omitempty"`        // 60 to 120 seconds
+	ReadHeaderTimeout int    `json:"read_header_timeout,omitempty"` // default get from ReadTimeout
 
 	SysMetrics bool   `json:"sys_metrics"` //
 	SysAPIKey  string `json:"sys_api_key"`
 	ListenSys  string `json:"listen_sys"`
+
+	AllowOrigins []string `json:"allow_origins"`
+	HeadersDel   []string `json:"headers_del"`
+	HeadersAdd   []string `json:"headers_add"`
+	// default-src 'self' 'unsafe-inline' 'unsafe-eval' data: *.openstreetmap.org *.googleapis.com *.gstatic.com *.youtube.com
+	ContentPolicy string `json:"content_policy"`
+
+	BodyLimit string `json:"body_limit"` // 2M 2000K 1G
 }
 
 type AppConfigMod struct {
@@ -284,8 +318,10 @@ type AppConfigMod struct {
 }
 
 type AppConfigGeoIP struct {
-	File    string `json:"file"`
-	Enabled bool   `json:"enabled"`
+	File         string   `json:"file"`
+	Enabled      bool     `json:"enabled"`
+	AllowCountry []string `json:"allow_country"`
+	BlockCountry []string `json:"block_country"`
 }
 
 type AppConfig struct {
@@ -346,9 +382,10 @@ func NewAppConfig() *AppConfig {
 
 		HTTPTransport: AppConfigHTTPTransport{},
 		HTTPServer: AppConfigHTTPServer{
-			ReadTimeout:  5,
-			WriteTimeout: 10,
-			IdleTimeout:  30,
+			RequestTimeout: 20,
+			ReadTimeout:    5,
+			WriteTimeout:   10,
+			IdleTimeout:    30,
 
 			RateLimit: 5,
 			RateBurst: 10,
@@ -360,6 +397,8 @@ func NewAppConfig() *AppConfig {
 			SysAPIKey: "",
 
 			CertHosts: []string{},
+
+			BodyLimit: "2M",
 		},
 	}
 
@@ -413,6 +452,29 @@ func (x *AppConfig) readEnvVar() error {
 	reader.String(&x.Env, "env", nil)
 	reader.String(&x.Title, "title", nil)
 
+	// Http server
+	reader.Bool(&x.HTTPServer.AccessLog, "http_access_log", nil)
+	reader.Float64(&x.HTTPServer.RateLimit, "http_rate_limit", nil)
+	reader.Int(&x.HTTPServer.RateBurst, "http_rate_burst", nil)
+	reader.String(&x.HTTPServer.Listen, "http_listen", nil)        // =>listen
+	reader.String(&x.HTTPServer.ListenTLS, "http_listen_tls", nil) // =>listen_tls
+	reader.Bool(&x.HTTPServer.AutoTLS, "http_auto_tls", nil)
+	reader.Bool(&x.HTTPServer.RedirectHTTPS, "http_redirect_https", nil)
+	reader.Bool(&x.HTTPServer.RedirectWWW, "http_redirect_www", nil)
+	reader.String(&x.HTTPServer.CertDir, "http_cert_dir", nil) // =>cert_dir
+	reader.Int(&x.HTTPServer.ReadTimeout, "http_read_timeout", nil)
+	reader.Int(&x.HTTPServer.WriteTimeout, "http_write_timeout", nil)
+	reader.Int(&x.HTTPServer.IdleTimeout, "http_idle_timeout", nil)
+	reader.Int(&x.HTTPServer.ReadHeaderTimeout, "http_read_header_timeout", nil)
+	reader.String(&x.HTTPServer.ListenSys, "http_listen_sys", nil)  // =>listen_sys
+	reader.String(&x.HTTPServer.SysAPIKey, "http_sys_api_key", nil) // =>sys_api_key
+	reader.StringArray(&x.HTTPServer.AllowOrigins, "http_allow_origins", nil)
+	reader.StringArray(&x.HTTPServer.HeadersDel, "http_headers_del", nil)
+	reader.StringArray(&x.HTTPServer.HeadersAdd, "http_headers_add", nil)
+	reader.String(&x.HTTPServer.ContentPolicy, "http_content_policy", nil)
+	reader.String(&x.HTTPServer.BodyLimit, "http_body_limit", nil) // =>body_limit
+	reader.Int(&x.HTTPServer.RequestTimeout, "http_request_timeout", nil)
+
 	reader.String(&x.HTTPServer.CertDir, "cert_dir", &CmdLine.CertDir)
 
 	reader.String(&x.GeoIP.File, "geo_ip_file", &CmdLine.GeoIPFile)
@@ -427,6 +489,17 @@ func (x *AppConfig) readEnvVar() error {
 
 	reader.StringArray(&x.Proxy.Targets, "tragets", &CmdLine.Targets)
 	reader.StringArray(&x.HTTPServer.CertHosts, "cert_hosts", &CmdLine.CertHosts)
+
+	reader.StringArray(&x.GeoIP.AllowCountry, "allow_country", nil)
+	reader.StringArray(&x.GeoIP.BlockCountry, "block_country", nil)
+
+	reader.StringArray(&x.HTTPServer.AllowOrigins, "allow_origins", nil)
+	reader.StringArray(&x.HTTPServer.HeadersDel, "headers_del", nil)
+	reader.StringArray(&x.HTTPServer.HeadersAdd, "headers_add", nil)
+	reader.String(&x.HTTPServer.ContentPolicy, "content_policy", nil)
+
+	reader.String(&x.HTTPServer.BodyLimit, "body_limit", nil)
+	reader.Int(&x.HTTPServer.RequestTimeout, "request_timeout", nil)
 
 	if reader.envError != nil {
 		return reader.envError

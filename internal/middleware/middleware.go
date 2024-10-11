@@ -32,11 +32,6 @@ func Init(e *echo.Echo, appService service.AppService) {
 
 	e.Use(middleware.Recover()) // !!!
 
-	{
-		// prevent log
-		e.GET("/favicon.ico", func(c echo.Context) error { return c.NoContent(http.StatusNotFound) })
-	}
-
 	if appConfig.HTTPServer.AccessLog {
 
 		cnf := middleware.DefaultLoggerConfig
@@ -64,6 +59,11 @@ func Init(e *echo.Echo, appService service.AppService) {
 	initProxy(e, appService)
 
 	initGeoIP(e, appService) // .Pre
+
+	{
+		// prevent log
+		e.GET("/favicon.ico", func(c echo.Context) error { return c.NoContent(http.StatusNotFound) })
+	}
 }
 
 func newHTTPErrorHandler(appService service.AppService) echo.HTTPErrorHandler {
@@ -192,28 +192,124 @@ func initRedirect(e *echo.Echo, appService service.AppService) {
 		// if .Host has sub domain sub.example.com
 		return (len(strings.SplitN(c.Request().Host, ".", 3)) > 2)
 	}
-	noTLS := func(c echo.Context) bool {
-		// path := c.Request().URL.Path
-		// return strings.HasPrefix(path, "/.well-known/acme-challenge")
-		return false
-	}
 
 	// e.Pre(middleware.HTTPSWWWRedirectWithConfig(middleware.RedirectConfig{Skipper: hasSubDomain}))
 	//
 	if appConfig.HTTPServer.RedirectHTTPS {
-		e.Pre(middleware.HTTPSRedirectWithConfig(middleware.RedirectConfig{Skipper: noTLS})) // may be 307
-
+		e.Pre(middleware.HTTPSRedirectWithConfig(middleware.RedirectConfig{})) // may be 307
 	}
+
 	if appConfig.HTTPServer.RedirectWWW {
 		e.Pre(middleware.WWWRedirectWithConfig(middleware.RedirectConfig{Skipper: hasSubDomain}))
-
 	}
 	//
 	// e.Pre(middleware.HTTPSNonWWWRedirect())
 
 }
 
-func initContentSecurity(e *echo.Echo, _ service.AppService) {
+func initContentSecurity(e *echo.Echo, appService service.AppService) {
+
+	// middleware.SecureWithConfig()
+	// middleware.Timeout()
+
+	appConfig := appService.Config()
+	cs := appConfig.HTTPServer
+
+	// if cs.RequestTimeout > 0 {
+	// 	// TODO
+	// 	// // from sources
+	// 	// // WARNING: Timeout middleware causes more problems than it solves.
+	// 	// // should be first middleware as it messes with request Writer
+	// 	// e.Use(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
+	// 	// 	Timeout: time.Duration(cs.RequestTimeout) * time.Second,
+	// 	// }))
+	// }
+
+	if cs.BodyLimit != "" {
+		e.Use(middleware.BodyLimit(cs.BodyLimit))
+
+		xlog.Warn("Body limit is: %v", cs.BodyLimit)
+	} else {
+		xlog.Warn("Body limit is empty")
+	}
+
+	if len(cs.AllowOrigins) > 0 {
+		e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+			AllowOrigins: cs.AllowOrigins,
+		}))
+
+		xlog.Info("Allow origins: %v", cs.AllowOrigins)
+	}
+
+	{
+		headersDel := cs.HeadersDel
+		headersAdd := [][]string{}
+		contentPolicy := cs.ContentPolicy
+		for _, v := range cs.HeadersAdd {
+			parts := strings.SplitN(v, ":", 2) // name=value
+			if len(parts) < 2 {
+				continue
+			}
+			parts[1] = strings.TrimSpace(parts[1])
+			headersAdd = append(headersAdd, parts)
+		}
+		handlers := []func(r *echo.Response){}
+		if len(headersDel) > 0 {
+			handlers = append(handlers, func(r *echo.Response) {
+				h := r.Header()
+				for _, v := range headersDel {
+					h.Del(v)
+				}
+			})
+			xlog.Info("Headers del: %v", headersDel)
+		}
+		if len(headersAdd) > 0 {
+			handlers = append(handlers, func(r *echo.Response) {
+				h := r.Header()
+				for _, v := range headersAdd {
+					h.Add(v[0], v[1])
+				}
+			})
+			xlog.Info("Headers add: %v", headersAdd)
+		}
+		if contentPolicy != "" {
+			handlers = append(handlers, func(r *echo.Response) {
+				h := r.Header()
+				// if text/html; charset=utf-8
+				if strings.HasPrefix(h.Get(echo.HeaderContentType), echo.MIMETextHTML) {
+					h.Add(echo.HeaderContentSecurityPolicy, contentPolicy)
+				}
+			})
+			xlog.Info("Content policy: %v", contentPolicy)
+		}
+
+		if len(handlers) > 0 {
+
+			handler := func(r *echo.Response) {
+				for _, v := range handlers {
+					v(r)
+				}
+			}
+
+			e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+				return func(c echo.Context) error {
+
+					r := c.Response()
+
+					h := func() {
+						handler(r)
+					}
+
+					r.Before(h)
+
+					return next(c)
+				}
+			})
+
+		}
+
+	}
+
 	// TODO proxy add content origin headers CorsAccessControlAllowOrigin
 	// e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
 
@@ -232,6 +328,7 @@ func initContentSecurity(e *echo.Echo, _ service.AppService) {
 	// 	}
 
 	// })
+
 }
 func initRateLimit(e *echo.Echo, appService service.AppService) {
 	// TODO for public use (rate limit, cache, headers time out)
@@ -241,7 +338,7 @@ func initRateLimit(e *echo.Echo, appService service.AppService) {
 	rateLimit := appConfig.HTTPServer.RateLimit
 	rateBurst := appConfig.HTTPServer.RateBurst
 
-	if rateLimit > 0 {
+	if rateLimit > 0.000001 { //
 		rateStoreConfig := middleware.RateLimiterMemoryStoreConfig{
 			Rate:      rate.Limit(rateLimit), //   rate.Limit(10),
 			Burst:     rateBurst,

@@ -132,7 +132,7 @@ func (x *Command) startWithGracefulShutdown() {
 					xlog.Panic("Path not exists : %v error: %v", itm, err)
 				}
 
-				xlog.Info("Cert path: %v", itm)
+				xlog.Info("Cert path: %v", itm) // 1 2 3
 			}
 
 			if err := webDriver.StartTLS(listen, crt, key); err != nil {
@@ -174,6 +174,7 @@ func (x *Command) startWithGracefulShutdown() {
 				xlog.Info("Cert path: %v", itm)
 			}
 
+			// .Email
 			webDriver.AutoTLSManager.Prompt = autocert.AcceptTOS
 			webDriver.AutoTLSManager.HostPolicy = autocert.HostWhitelist(certHosts...) // Add your domain(s) here
 			webDriver.AutoTLSManager.Cache = autocert.DirCache(certDir)                // Directory for storing certificates

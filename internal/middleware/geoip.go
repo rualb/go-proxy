@@ -3,7 +3,9 @@ package middleware
 import (
 	"go-proxy/internal/config"
 	xlog "go-proxy/internal/tool/toollog"
+	webfs "go-proxy/web"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,45 +18,58 @@ import (
 func NewGeoIP(cnf config.AppConfigGeoIP) echo.MiddlewareFunc {
 
 	if cnf.File == "" {
-		xlog.Panic("GeoIp db file is empty")
+		xlog.Panic("GIS data file is empty")
 	}
 	filename, err := filepath.Abs(cnf.File)
 
 	if err != nil {
-		xlog.Panic("GeoIp db file: %v error: %v", filename, err)
+		xlog.Panic("GIS data file: %v error: %v", filename, err)
 	}
 
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		xlog.Panic("GeoIp db file: %v error: %v", filename, err)
+		xlog.Panic("GIS data file: %v error: %v", filename, err)
 	}
 
-	xlog.Info("GeoIp db file: %v", filename)
+	xlog.Info("GIS data file: %v", filename)
 
-	db, err := geoip2.Open(filename)
-	if err != nil {
-		xlog.Panic("GeoIp db file: %v error: %v", filename, err)
+	handler := &gisHandler{}
+	handler.mustOpenData(filename)
+	handler.loadLists(cnf.AllowCountry, cnf.BlockCountry)
+
+	if len(cnf.AllowCountry) > 0 {
+		xlog.Info("Allow country: %v", cnf.AllowCountry)
 	}
 
-	// defer db.Close()
+	if len(cnf.BlockCountry) > 0 {
+		xlog.Info("Block country: %v", cnf.BlockCountry)
+	}
+
+	// defer handler.closeDb()
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 
 		return func(c echo.Context) error {
-			countryCode := ""
+
 			ipStr := c.RealIP()
-			ip := net.ParseIP(ipStr)
-			country, err := db.Country(ip)
-			if err != nil {
-				xlog.Debug("Ip to country ip: %v error: %v", ipStr, err)
-			}
+			countryCode := handler.ipToCountry(ipStr)
 
-			if country != nil {
-				countryCode = country.Country.IsoCode
-			}
-
-			countryCode = strings.ToLower(countryCode)
 			// c.Request().Header.Del("X-Country-Code")
 			c.Request().Header.Set("X-Country-Code", countryCode) // map[string][]string
+
+			{
+
+				// c.Set("country", countryCode)
+
+				if handler.isBlocked(countryCode) {
+					// block
+					data, _ := webfs.Status(http.StatusUnavailableForLegalReasons)
+
+					// c.Response().Header().Set("X-Country-Code", countryCode) //
+
+					return c.HTMLBlob(http.StatusUnavailableForLegalReasons, data)
+
+				}
+			}
 
 			return next(c)
 		}
@@ -62,3 +77,84 @@ func NewGeoIP(cnf config.AppConfigGeoIP) echo.MiddlewareFunc {
 	}
 
 }
+
+type gisHandler struct {
+	allowList map[string]bool // country qw,er
+	blockList map[string]bool // country qw,er
+	db        *geoip2.Reader
+}
+
+func (x *gisHandler) mustOpenData(filename string) {
+	var err error
+	x.db, err = geoip2.Open(filename)
+	if err != nil {
+		xlog.Panic("GIS data file: %v error: %v", filename, err)
+	}
+}
+
+//	func (x *gisHandler) closeDb() {
+//		if x.db == nil {
+//			x.db.Close()
+//		}
+//	}
+
+func (x *gisHandler) ipToCountry(ipStr string) string {
+
+	res := ""
+	if x.db == nil {
+		return res
+	}
+	ip := net.ParseIP(ipStr)
+	country, err := x.db.Country(ip)
+
+	if err != nil {
+		xlog.Debug("IP to country IP: %v error: %v", ipStr, err)
+	}
+
+	if country != nil {
+		res = country.Country.IsoCode
+		res = strings.ToLower(res)
+	}
+
+	return res
+}
+
+func (x *gisHandler) isBlocked(countryCode string) bool {
+
+	if len(x.allowList) > 0 {
+		return !x.allowList[countryCode]
+	}
+
+	if len(x.blockList) > 0 {
+		return x.blockList[countryCode]
+	}
+
+	return false
+
+}
+
+func (x *gisHandler) loadLists(allowList []string, blockList []string) {
+
+	x.allowList = map[string]bool{} // country qw,er
+	x.blockList = map[string]bool{} // country qw,er
+
+	for _, v := range allowList {
+		x.allowList[v] = true
+	}
+
+	for _, v := range blockList {
+		x.blockList[v] = true
+	}
+	{
+		// 127.0.0.1 and etc
+		// countryMap[""] = true
+	}
+
+}
+
+// func isLocalIP(ipStr string) bool {
+
+// 	return strings.HasPrefix(ipStr, "127.0.0.") ||
+// 		strings.HasPrefix(ipStr, "10.") ||
+// 		strings.HasPrefix(ipStr, "192.168.0.")
+// }
