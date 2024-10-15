@@ -15,7 +15,7 @@ git tag "$(cat VERSION)"
 git tag (Get-Content VERSION)
 """
 
-
+env = os.environ.copy()
 AppName = "go-proxy"
 
 def test():
@@ -34,6 +34,12 @@ def help():
 def build():
     print("Building the binary...")
     subprocess.run(["go", "build",  "-C", f"cmd/{AppName}", "-o",f"./../../dist/", "-ldflags", "-s -w", ])
+
+def linux():
+    env["GOOS"]="linux"
+    env["GOARCH"]="amd64" 
+    print("Building the binary... linux amd64")
+    subprocess.run(["go", "build",  "-C", f"cmd/{AppName}", "-o",f"./../../dist/", "-ldflags", "-s -w", ], env=env)
  
 def run():
     print("Building the binary...")
@@ -53,6 +59,8 @@ if len(sys.argv) > 1:
         help() 
     elif command == "build":
         build() 
+    elif command == "linux":
+        linux() 
     elif command == "run":
         run() 
     elif command == "lint":

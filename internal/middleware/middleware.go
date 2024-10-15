@@ -32,6 +32,8 @@ func Init(e *echo.Echo, appService service.AppService) {
 
 	e.Use(middleware.Recover()) // !!!
 
+	initGeoIP(e, appService) // .Pre
+
 	if appConfig.HTTPServer.AccessLog {
 
 		cnf := middleware.DefaultLoggerConfig
@@ -57,8 +59,6 @@ func Init(e *echo.Echo, appService service.AppService) {
 	initRequestID(e, appService)
 
 	initProxy(e, appService)
-
-	initGeoIP(e, appService) // .Pre
 
 	{
 		// prevent log
@@ -209,6 +209,7 @@ func initRedirect(e *echo.Echo, appService service.AppService) {
 
 func initContentSecurity(e *echo.Echo, appService service.AppService) {
 
+	// X-Frame-Options: SAMEORIGIN; => Content-Security-Policy: frame-ancestors 'self';
 	// middleware.SecureWithConfig()
 	// middleware.Timeout()
 
@@ -370,6 +371,8 @@ func initRateLimit(e *echo.Echo, appService service.AppService) {
 		}
 
 		e.Use(middleware.RateLimiterWithConfig(rateLimiterConfig))
+	} else {
+		xlog.Warn("Rate limit not active")
 	}
 }
 
@@ -398,45 +401,85 @@ func initProxy(e *echo.Echo, appService service.AppService) {
 	appConfig := appService.Config()
 	{
 
-		for _, target := range appConfig.Proxy.Targets {
+		for _, upstream := range appConfig.Proxy.Upstreams {
 
-			target = strings.TrimSpace(target)
-			parts := strings.SplitN(target, " ", 2)
-			target = strings.TrimSpace(parts[0])
+			// httputil.NewSingleHostReverseProxy(serverURL)
 
-			parsedURL, err := url.Parse(target)
-
+			trg, err := newProxyUpstream(upstream)
 			if err != nil {
-				panic(fmt.Errorf("error on parse proxy target %v: %v", target, err))
+				xlog.Panic("Error on try add proxy upstream: %v", err)
 			}
-
-			origin := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host /*has port*/)
-			prefix := parsedURL.Path
 
 			{
 
-				xlog.Info("Adding proxy target: %v => %v", prefix, origin)
+				balancer := middleware.NewRoundRobinBalancer([]*middleware.ProxyTarget{})
 
-				targetURL, err := url.Parse(origin) // downstream
-				if err != nil {
-					panic(fmt.Errorf("error on parse proxy target %v: %v", target, err))
+				for _, v := range trg.server {
+					xlog.Info("Adding proxy upstream: %v => %v", trg.prefix, v)
+					serverURL, err := url.Parse(v) // downstream
+					if err != nil {
+						panic(fmt.Errorf("error on parse proxy upstream %v: %v", upstream, err))
+					}
+					// .NewRandomBalancer()
+					balancer.AddTarget(&middleware.ProxyTarget{
+						URL:  serverURL,
+						Name: v, // !!! server ID
+					})
 				}
 
-				balancer := middleware.NewRoundRobinBalancer([]*middleware.ProxyTarget{})
-				balancer.AddTarget(&middleware.ProxyTarget{
-					URL: targetURL,
-				})
-
 				proxyConfig := middleware.DefaultProxyConfig
-
 				proxyConfig.Balancer = balancer
-
+				proxyConfig.RetryCount = 0 // 0, meaning requests are never retried
+				proxyConfig.ErrorHandler = func(c echo.Context, err error) error {
+					return err
+				}
+				proxyConfig.ModifyResponse = func(r *http.Response) error {
+					return nil
+				}
 				funcMw := middleware.ProxyWithConfig(proxyConfig)
-
-				e.RouteNotFound(prefix, nil, funcMw)
+				e.RouteNotFound(trg.prefix, nil, funcMw)
 			}
 		}
 
 	}
 
+}
+
+type proxyUpstream struct {
+	server []string
+	prefix string
+}
+
+func newProxyUpstream(upstream string) (*proxyUpstream, error) {
+
+	upstream = strings.TrimSpace(upstream)
+	// parts := strings.SplitN(upstream, " ", 2)
+	// upstream = strings.TrimSpace(parts[0])
+
+	parsedURL, err := url.Parse(upstream)
+
+	if err != nil {
+		return nil, fmt.Errorf("error on parse proxy upstream %v: %v", upstream, err)
+		// panic()
+	}
+
+	r := &proxyUpstream{}
+	r.server = append(r.server,
+		fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host /*has port*/),
+	)
+	args := parsedURL.Query()
+
+	{
+		// extra servers
+		serverExt := args["server"]
+		for _, v := range serverExt {
+			r.server = append(r.server,
+				fmt.Sprintf("%s://%s", parsedURL.Scheme, v /*has port*/),
+			)
+		}
+	}
+
+	r.prefix = parsedURL.Path
+
+	return r, nil
 }

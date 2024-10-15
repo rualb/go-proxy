@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -17,13 +18,12 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// TestHealthController_Check_Stats tests the ?cmd=stats case in the Check method
-func TestCmd(t *testing.T) {
+func TestCmd1(t *testing.T) {
 	// Setup Echo context
 	// github: listen tcp 127.0.0.1:80: bind: permission denied "sudo go test"
 
-	config.CmdLine.Listen = "localhost:10080"
-	config.CmdLine.ListenTLS = "localhost:10443"
+	config.CmdLine.Listen = "127.0.0.1:10080"
+	config.CmdLine.ListenTLS = "127.0.0.1:10443"
 
 	cwd, _ := os.Getwd() // ..go-proxy/test/e2e"
 	projectRoot, _ := tooltest.GetProjectRoot()
@@ -33,33 +33,54 @@ func TestCmd(t *testing.T) {
 
 	config.CmdLine.CertDir = filepath.Join(projectRoot, "configs/cert")
 
-	config.CmdLine.Targets = append(config.CmdLine.Targets,
-		"http://localhost:10081/test/*",
+	config.CmdLine.Upstreams = append(config.CmdLine.Upstreams,
+		"http://127.0.0.1:10081/test1",
+	)
+
+	config.CmdLine.Upstreams = append(config.CmdLine.Upstreams,
+		"http://127.0.0.1:10082/test2?server=127.0.0.1:10083",
 	)
 	config.CmdLine.CertHosts = append(config.CmdLine.CertHosts,
 		"localhost",
 	)
 
-	eSrv := echo.New()
-	eSrv.GET("/test/test12345", func(c echo.Context) error {
-		return c.String(http.StatusOK, c.QueryParam("msg"))
-	})
-	go func() {
-		eSrv.Start("localhost:10081")
-	}()
+	for i := 1; i <= 3; i++ {
+		e1 := echo.New()
+		pathSuffix := strconv.Itoa(i)
+		listen := "127.0.0.1:" + strconv.Itoa(10080+i)
+		if i == 3 {
+			pathSuffix = "2"
+		}
+		path := "/test" + pathSuffix
+		e1.GET(path, func(c echo.Context) error {
+			return c.String(http.StatusOK, "test "+strconv.Itoa(i))
+		})
+		go func() {
+			t.Logf("Temp server on: %v%v", listen, path)
+
+			err := e1.Start(listen)
+			if err != nil {
+				t.Logf("Error : %v", err)
+			}
+		}()
+
+		defer e1.Shutdown(context.TODO())
+	}
 
 	cmd := xcmd.Command{}
 
 	go cmd.Exec()
 
-	time.Sleep(3 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	urls := []struct {
 		title  string
 		url    string
 		search string
 	}{
-		{title: "test proxy", search: "1234567890", url: "http://localhost:10080/test/test12345?msg=1234567890"},
+		{title: "test1", search: "test 1", url: "http://127.0.0.1:10080/test1"},
+		{title: "test2", search: "test 2", url: "http://127.0.0.1:10080/test2"},
+		{title: "test3 (RoundRobinBalancer)", search: "test 3", url: "http://127.0.0.1:10080/test2"},
 	}
 
 	for _, itm := range urls {
@@ -68,12 +89,12 @@ func TestCmd(t *testing.T) {
 
 			t.Logf("url %v", itm.url)
 			respData, err := toolhttp.GetBytes(itm.url, nil, nil)
-
+			respDataStr := string(respData)
 			if err != nil {
 				t.Errorf("Error : %v", err)
 			}
 
-			if !strings.Contains(string(respData), itm.search) {
+			if !strings.Contains(respDataStr, itm.search) {
 				t.Errorf("Error on %v", itm.url)
 			} else {
 
@@ -86,8 +107,6 @@ func TestCmd(t *testing.T) {
 	}
 
 	cmd.Stop()
-
-	eSrv.Shutdown(context.TODO())
 
 	time.Sleep(1 * time.Second)
 

@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/tls"
 	"fmt"
 	"go-proxy/internal/config"
 	"go-proxy/internal/middleware"
@@ -43,7 +45,9 @@ func (x *Command) Exec() {
 
 	x.WebDriver = echo.New()
 	x.WebDriver.Logger.SetLevel(elog.INFO) // has "file":"cmd.go","line":"85"
+	//
 
+	//
 	middleware.Init(x.WebDriver, x.AppService) // 1
 	router.Init(x.WebDriver, x.AppService)     // 2
 
@@ -57,6 +61,46 @@ func (x *Command) Exec() {
 	time.Sleep(400 * time.Microsecond)
 }
 
+func applyServerTLS(s *http.Server, c *config.AppConfig) {
+
+	sessionCache := c.HTTPServer.TLSSessionCache
+	sessionTickets := c.HTTPServer.TLSSessionTickets
+
+	cfg := s.TLSConfig
+	//
+	if sessionCache {
+		sessionCacheSize := c.HTTPServer.TLSSessionCacheSize
+		if sessionCacheSize <= 0 {
+			sessionCacheSize = 128
+		}
+		cfg.ClientSessionCache = tls.NewLRUClientSessionCache(sessionCacheSize)
+
+		xlog.Info("Enabled TLS session cache: size: %v", sessionCacheSize)
+	}
+
+	if sessionTickets {
+		//
+		cfg.SessionTicketsDisabled = false
+		go func() {
+			ticker := time.NewTicker(24 * time.Hour) // Rotate every 24 hours
+			defer ticker.Stop()
+			for range ticker.C {
+				var newKey [32]byte
+				_, err := rand.Read(newKey[:])
+				if err != nil {
+					xlog.Error("Failed to generate session ticket key: %v", err)
+				} else {
+					cfg.SetSessionTicketKeys([][32]byte{newKey}) // Replace the keys
+				}
+			}
+		}()
+
+		xlog.Info("Enabled TLS session tickets")
+	}
+
+	s.TLSConfig = cfg
+
+}
 func applyServer(s *http.Server, c *config.AppConfig) {
 
 	s.ReadTimeout = time.Duration(c.HTTPServer.ReadTimeout) * time.Second
@@ -200,6 +244,8 @@ func (x *Command) startWithGracefulShutdown() {
 		}
 
 		if appConfig.HTTPServer.ListenTLS != "" {
+
+			applyServerTLS(webDriver.TLSServer, appConfig)
 
 			if appConfig.HTTPServer.AutoTLS {
 				go serveAutoTLS(appConfig.HTTPServer.ListenTLS,

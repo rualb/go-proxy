@@ -45,7 +45,7 @@ type CmdLineConfig struct {
 	Name      string
 	IsMaint   bool
 	Version   bool
-	Targets   []string // ["",""]
+	Upstreams []string // ["",""]
 	CertHosts []string // ["",""]
 	GeoIPFile string
 
@@ -87,16 +87,16 @@ func ReadFlags() {
 	flag.StringVar(&CmdLine.Env, "env", "", "Environment: development, testing, staging, production")
 	flag.StringVar(&CmdLine.Name, "name", "", "App name")
 
-	flag.Func("target", "Proxy target URL", func(value string) error {
-		CmdLine.Targets = append(CmdLine.Targets, value)
+	flag.Func("upstream", "Proxy upstream URL", func(value string) error {
+		CmdLine.Upstreams = append(CmdLine.Upstreams, value)
 		return nil
 	})
 
-	flag.Func("targets", "Proxy targets URL as json array", func(value string) (err error) {
+	flag.Func("upstreams", "Proxy upstreams URL as json array", func(value string) (err error) {
 		if value != "" {
 			tmp := []string{}
 			if err = json.Unmarshal([]byte(value), &tmp); err != nil {
-				CmdLine.Targets = append(CmdLine.Targets, tmp...)
+				CmdLine.Upstreams = append(CmdLine.Upstreams, tmp...)
 			}
 		}
 		return err
@@ -153,6 +153,7 @@ func (x *envReader) String(p *string, name string, cmdValue *string) {
 	}
 
 }
+
 func (x *envReader) StringArray(p *[]string, name string, cmdValue *[]string) {
 	envName := strings.ToUpper(x.prefix + name) // *nix case-sensitive
 	if cmdValue != nil && len(*cmdValue) > 0 {
@@ -265,7 +266,7 @@ type Database struct {
 // }
 
 type AppConfigProxy struct {
-	Targets        []string       `json:"targets"` // records "http://localhost:8080/api/test/ping"
+	Upstreams      []string       `json:"upstreams"` // records "http://127.0.0.1:8080/api/test/ping"
 	OverrideStatus map[int]string `json:"override_status"`
 }
 
@@ -305,6 +306,10 @@ type AppConfigHTTPServer struct {
 	ContentPolicy string `json:"content_policy"`
 
 	BodyLimit string `json:"body_limit"` // 2M 2000K 1G
+
+	TLSSessionCacheSize int  `json:"tls_session_cache_size"` //
+	TLSSessionCache     bool `json:"tls_session_cache"`      //
+	TLSSessionTickets   bool `json:"tls_session_tickets"`    //
 }
 
 type AppConfigMod struct {
@@ -390,15 +395,18 @@ func NewAppConfig() *AppConfig {
 			RateLimit: 5,
 			RateBurst: 10,
 
-			Listen:    "localhost:80",
-			ListenTLS: "localhost:443",
+			Listen:    "127.0.0.1:80",
+			ListenTLS: "127.0.0.1:443",
 			CertDir:   "",
 
 			SysAPIKey: "",
 
 			CertHosts: []string{},
 
-			BodyLimit: "2M",
+			BodyLimit: "2M", // 2M 2000K 1G
+
+			TLSSessionCache:   false,
+			TLSSessionTickets: false,
 		},
 	}
 
@@ -487,7 +495,7 @@ func (x *AppConfig) readEnvVar() error {
 
 	reader.String(&x.HTTPServer.SysAPIKey, "sys_api_key", &CmdLine.SysAPIKey)
 
-	reader.StringArray(&x.Proxy.Targets, "tragets", &CmdLine.Targets)
+	reader.StringArray(&x.Proxy.Upstreams, "tragets", &CmdLine.Upstreams)
 	reader.StringArray(&x.HTTPServer.CertHosts, "cert_hosts", &CmdLine.CertHosts)
 
 	reader.StringArray(&x.GeoIP.AllowCountry, "allow_country", nil)
@@ -500,6 +508,10 @@ func (x *AppConfig) readEnvVar() error {
 
 	reader.String(&x.HTTPServer.BodyLimit, "body_limit", nil)
 	reader.Int(&x.HTTPServer.RequestTimeout, "request_timeout", nil)
+
+	reader.Int(&x.HTTPServer.TLSSessionCacheSize, "http_tls_session_cache_size", nil)
+	reader.Bool(&x.HTTPServer.TLSSessionCache, "http_tls_session_cache", nil)
+	reader.Bool(&x.HTTPServer.TLSSessionTickets, "http_tls_session_tickets", nil)
 
 	if reader.envError != nil {
 		return reader.envError
