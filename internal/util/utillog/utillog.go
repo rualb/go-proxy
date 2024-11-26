@@ -1,4 +1,4 @@
-package toollog
+package utillog
 
 import (
 	"fmt"

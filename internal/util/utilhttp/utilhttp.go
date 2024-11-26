@@ -1,4 +1,4 @@
-package toolhttp
+package utilhttp
 
 import (
 	"bytes"

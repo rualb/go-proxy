@@ -6,7 +6,7 @@ import (
 
 	"time"
 
-	xlog "go-proxy/internal/tool/toollog"
+	xlog "go-proxy/internal/util/utillog"
 	"net/http"
 )
 

@@ -2,25 +2,24 @@ package middleware
 
 import (
 	"go-proxy/internal/config"
-	xlog "go-proxy/internal/tool/toollog"
+	xlog "go-proxy/internal/util/utillog"
 	webfs "go-proxy/web"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/oschwald/geoip2-golang"
 )
 
-func NewGeoIP(cnf config.AppConfigGeoIP) echo.MiddlewareFunc {
+func NewGeoIP(cfg config.AppConfigGeoIP) echo.MiddlewareFunc {
 
-	if cnf.File == "" {
+	if cfg.File == "" {
 		xlog.Panic("GIS data file is empty")
 	}
-	filename, err := filepath.Abs(cnf.File)
+	filename, err := filepath.Abs(cfg.File)
 
 	if err != nil {
 		xlog.Panic("GIS data file: %v error: %v", filename, err)
@@ -34,14 +33,14 @@ func NewGeoIP(cnf config.AppConfigGeoIP) echo.MiddlewareFunc {
 
 	handler := &gisHandler{}
 	handler.mustOpenData(filename)
-	handler.loadLists(cnf.AllowCountry, cnf.BlockCountry)
+	handler.loadLists(cfg.AllowCountry, cfg.BlockCountry)
 
-	if len(cnf.AllowCountry) > 0 {
-		xlog.Info("Allow country: %v", cnf.AllowCountry)
+	if len(cfg.AllowCountry) > 0 {
+		xlog.Info("Allow country: %v", cfg.AllowCountry)
 	}
 
-	if len(cnf.BlockCountry) > 0 {
-		xlog.Info("Block country: %v", cnf.BlockCountry)
+	if len(cfg.BlockCountry) > 0 {
+		xlog.Info("Block country: %v", cfg.BlockCountry)
 	}
 
 	// defer handler.closeDb()
@@ -112,8 +111,8 @@ func (x *gisHandler) ipToCountry(ipStr string) string {
 	}
 
 	if country != nil {
-		res = country.Country.IsoCode
-		res = strings.ToLower(res)
+		res = country.Country.IsoCode // Upper case QQ iso code-2
+		// res = strings.ToLower(res)
 	}
 
 	return res

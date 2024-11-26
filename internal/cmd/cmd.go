@@ -15,7 +15,7 @@ import (
 	"path/filepath"
 	"time"
 
-	xlog "go-proxy/internal/tool/toollog"
+	xlog "go-proxy/internal/util/utillog"
 
 	"go-proxy/internal/router"
 

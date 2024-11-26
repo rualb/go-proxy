@@ -1,4 +1,4 @@
-package toolstring
+package utilstring
 
 import (
 	"net/url"

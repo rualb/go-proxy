@@ -1,4 +1,4 @@
-package toolconfig
+package utilconfig
 
 import (
 	"os"

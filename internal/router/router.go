@@ -9,7 +9,7 @@ import (
 
 	"go-proxy/internal/service"
 
-	xlog "go-proxy/internal/tool/toollog"
+	xlog "go-proxy/internal/util/utillog"
 
 	"github.com/labstack/echo-contrib/echoprometheus"
 	"github.com/labstack/echo/v4/middleware"

@@ -3,8 +3,8 @@ package middleware
 import (
 	"fmt"
 	"go-proxy/internal/service"
-	"go-proxy/internal/tool/toolhttp"
-	xlog "go-proxy/internal/tool/toollog"
+	"go-proxy/internal/util/utilhttp"
+	xlog "go-proxy/internal/util/utillog"
 	webfs "go-proxy/web"
 	"net/http"
 	"net/url"
@@ -36,20 +36,20 @@ func Init(e *echo.Echo, appService service.AppService) {
 
 	if appConfig.HTTPServer.AccessLog {
 
-		cnf := middleware.DefaultLoggerConfig
+		cfg := middleware.DefaultLoggerConfig
 
 		if appConfig.GeoIP.Enabled {
-			f := cnf.Format
+			f := cfg.Format
 			li := strings.LastIndex(f, "}") // insert before last "}"
 			f = f[:li] + `,"country":"${header:x-country-code}"` + f[li:]
-			cnf.Format = f
+			cfg.Format = f
 		}
 
-		cnf.Skipper = func(c echo.Context) bool {
+		cfg.Skipper = func(c echo.Context) bool {
 			return c.Request().URL.Path == "/favicon.ico"
 		}
 
-		e.Use(middleware.LoggerWithConfig(cnf))
+		e.Use(middleware.LoggerWithConfig(cfg))
 	}
 
 	initMaintenance(e, appService)
@@ -115,7 +115,7 @@ func newHTTPErrorHandler(appService service.AppService) echo.HTTPErrorHandler {
 						case strings.HasPrefix(redirect, "/"):
 							{
 								currentURL := c.Request().URL.String()
-								URL, err := toolhttp.JoinURL(redirect,
+								URL, err := utilhttp.JoinURL(redirect,
 									map[string]string{"return_url": currentURL},
 								)
 
@@ -180,8 +180,8 @@ func initRedirect(e *echo.Echo, appService service.AppService) {
 	appConfig := appService.Config()
 
 	//
-	// cnf := middleware.DefaultRedirectConfig
-	// cnf.Skipper = func(c echo.Context) bool {
+	// cfg := middleware.DefaultRedirectConfig
+	// cfg.Skipper = func(c echo.Context) bool {
 	// 	req, scheme := c.Request(), c.Scheme()
 	// 	host := req.Host
 	// 	// if http:// and has www. prefix or qwe.example.com has more than t

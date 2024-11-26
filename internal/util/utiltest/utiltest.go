@@ -1,4 +1,4 @@
-package tooltest
+package utiltest
 
 import (
 	"os"

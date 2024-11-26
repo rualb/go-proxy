@@ -13,10 +13,10 @@ import (
 	"strconv"
 	"strings"
 
-	xlog "go-proxy/internal/tool/toollog"
+	xlog "go-proxy/internal/util/utillog"
 
-	"go-proxy/internal/tool/toolconfig"
-	"go-proxy/internal/tool/toolhttp"
+	"go-proxy/internal/util/utilconfig"
+	"go-proxy/internal/util/utilhttp"
 )
 
 var (
@@ -583,7 +583,7 @@ func (x *AppConfigSource) Load() error {
 
 			xlog.Info("Loading config from: %v", dir)
 
-			err := toolconfig.LoadConfig(res /*pointer*/, dir, fileName)
+			err := utilconfig.LoadConfig(res /*pointer*/, dir, fileName)
 
 			if err != nil {
 				return err
@@ -705,7 +705,7 @@ func (x *AppConfig) FromURL(dir string, file string) error {
 
 	// fmt.Println("Reading config from file: ", file)
 
-	data, err := toolhttp.GetBytes(fullPath, nil, nil)
+	data, err := utilhttp.GetBytes(fullPath, nil, nil)
 
 	if err != nil {
 		return fmt.Errorf("error with file %v: %v", fullPath, err)

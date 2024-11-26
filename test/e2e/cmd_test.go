@@ -4,9 +4,9 @@ import (
 	"context"
 	xcmd "go-proxy/internal/cmd"
 	"go-proxy/internal/config"
-	"go-proxy/internal/tool/toolhttp"
-	xlog "go-proxy/internal/tool/toollog"
-	"go-proxy/internal/tool/tooltest"
+	"go-proxy/internal/util/utilhttp"
+	xlog "go-proxy/internal/util/utillog"
+	"go-proxy/internal/util/utiltest"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -26,7 +26,7 @@ func TestCmd1(t *testing.T) {
 	config.CmdLine.ListenTLS = "127.0.0.1:10443"
 
 	cwd, _ := os.Getwd() // ..go-proxy/test/e2e"
-	projectRoot, _ := tooltest.GetProjectRoot()
+	projectRoot, _ := utiltest.GetProjectRoot()
 
 	t.Logf("Cwd: %v", cwd)
 	t.Logf("Project root: %v", projectRoot)
@@ -88,7 +88,7 @@ func TestCmd1(t *testing.T) {
 		t.Run(itm.title, func(t *testing.T) {
 
 			t.Logf("url %v", itm.url)
-			respData, err := toolhttp.GetBytes(itm.url, nil, nil)
+			respData, err := utilhttp.GetBytes(itm.url, nil, nil)
 			respDataStr := string(respData)
 			if err != nil {
 				t.Errorf("Error : %v", err)
