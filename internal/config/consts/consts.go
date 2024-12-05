@@ -4,8 +4,8 @@ package consts
 const AppName = "go-proxy"
 
 const (
-	// DefaultTextSize def text size
-	DefaultTextSize = 100
+	// DefaultTextLength def text size
+	DefaultTextLength = 100
 
 	// WF_STATUS_NEW       = 0
 	// WF_STATUS_PROGRESS  = 6
@@ -33,6 +33,5 @@ const (
 	PathSysMetricsAPI = "/sys/api/metrics"
 	// PathAPITestPing = PathAPITest + "/ping" // no self ping
 
-	// PathTestHealthAPI = "/test/api/health"
-	PathTestPingAPI = "/test/api/ping"
+	PathProxyPingDebugAPI = "/proxy/api/ping"
 )

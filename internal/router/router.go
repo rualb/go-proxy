@@ -17,7 +17,7 @@ import (
 
 func Init(e *echo.Echo, appService service.AppService) {
 
-	initHealthController(e, appService)
+	initDebugController(e, appService)
 
 	initSys(e, appService)
 }
@@ -98,25 +98,9 @@ func initSys(e *echo.Echo, appService service.AppService) {
 
 }
 
-func initHealthController(e *echo.Echo, _ service.AppService) {
+func initDebugController(e *echo.Echo, _ service.AppService) {
+	e.GET(consts.PathProxyPingDebugAPI, func(c echo.Context) error { return c.String(http.StatusOK, "pong") })
 
-	// handler := func(c echo.Context) error {
-	// 	ctrl := controller.NewHealthController(appService, c)
-	// 	return ctrl.Check()
-	// }
-	// //
-	// e.GET(consts.PathTestHealthAPI, handler)
-	//
-	e.GET(consts.PathTestPingAPI, func(c echo.Context) error {
-		return c.String(http.StatusOK, "pong")
-	})
-
-	// e.POST(consts.PathTestPingAPI, func(c echo.Context) error {
-	// 	defer c.Request().Body.Close()
-	// 	data, _ := io.ReadAll(c.Request().Body)
-	// 	return c.String(http.StatusOK, strconv.Itoa(len(data)))
-	// })
-	//
 }
 
 /////////////////////////////////////////////////////
