@@ -343,7 +343,7 @@ func initRateLimit(e *echo.Echo, appService service.AppService) {
 		rateStoreConfig := middleware.RateLimiterMemoryStoreConfig{
 			Rate:      rate.Limit(rateLimit), //   rate.Limit(10),
 			Burst:     rateBurst,
-			ExpiresIn: 30 * time.Second,
+			ExpiresIn: 60 * time.Second,
 		}
 
 		xlog.Info("Starting rate control, store config: %v", rateStoreConfig)
@@ -429,7 +429,8 @@ func initProxy(e *echo.Echo, appService service.AppService) {
 
 				proxyConfig := middleware.DefaultProxyConfig
 				proxyConfig.Balancer = balancer
-				proxyConfig.RetryCount = 0 // 0, meaning requests are never retried
+				// proxyConfig.RetryCount = 0 // 0, meaning requests are never retried
+				proxyConfig.RetryCount = len(trg.server) - 1
 				proxyConfig.ErrorHandler = func(c echo.Context, err error) error {
 					return err
 				}
@@ -455,6 +456,7 @@ func newProxyUpstream(upstream string) (*proxyUpstream, error) {
 	upstream = strings.TrimSpace(upstream)
 	// parts := strings.SplitN(upstream, " ", 2)
 	// upstream = strings.TrimSpace(parts[0])
+	// http://127.0.0.1:10082/test2?server=127.0.0.1:10083
 
 	parsedURL, err := url.Parse(upstream)
 
