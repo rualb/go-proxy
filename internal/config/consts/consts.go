@@ -30,8 +30,11 @@ const (
 // )
 
 const (
+	PathAuthStatusAPI = "/auth/api/status" // get _csrf, user related, no-cache
+
 	PathSysMetricsAPI = "/sys/api/metrics"
 	// PathAPITestPing = PathAPITest + "/ping" // no self ping
 
-	PathProxyPingDebugAPI = "/proxy/api/ping"
+	PathProxyPingDebugAPI   = "/proxy/api/ping"
+	PathProxyStatusDebugAPI = "/proxy/api/status"
 )

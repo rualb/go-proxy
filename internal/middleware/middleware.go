@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"fmt"
+	"go-proxy/internal/config/consts"
 	"go-proxy/internal/service"
 	"go-proxy/internal/util/utilhttp"
 	xlog "go-proxy/internal/util/utillog"
@@ -101,14 +102,14 @@ func newHTTPErrorHandler(appService service.AppService) echo.HTTPErrorHandler {
 								data, err := webfs.Page(redirect)
 
 								if err != nil {
-									xlog.Error("Error on get page: %v", err)
+									xlog.Error("error on get page: %v", err)
 								}
 
 								// TODO not good content-length:0
 								err = c.HTMLBlob(http.StatusServiceUnavailable, data)
 
 								if err != nil {
-									xlog.Error("Error on send data: %v", err)
+									xlog.Error("error on send data: %v", err)
 								}
 
 							}
@@ -116,17 +117,17 @@ func newHTTPErrorHandler(appService service.AppService) echo.HTTPErrorHandler {
 							{
 								currentURL := c.Request().URL.String()
 								URL, err := utilhttp.JoinURL(redirect,
-									map[string]string{"return_url": currentURL},
+									map[string]string{"next": currentURL},
 								)
 
 								if err != nil {
-									xlog.Error("Error on url: %v", err)
+									xlog.Error("error on url: %v", err)
 								}
 
 								// TODO redirect not work here
 								err = c.Redirect(http.StatusSeeOther, URL)
 								if err != nil {
-									xlog.Error("Error on redirect: %v", err)
+									xlog.Error("error on redirect: %v", err)
 								}
 							}
 						}
@@ -226,12 +227,23 @@ func initContentSecurity(e *echo.Echo, appService service.AppService) {
 	// 	// }))
 	// }
 
+	if cs.CSRF {
+		// 1
+		e.Use(csrfAddCookieAndValidateMiddleware(appService))
+		// 2
+		e.Use(csrfAddHeaderMiddleware(appService))
+
+		xlog.Info("csrf middleware enabled")
+	} else {
+		xlog.Warn("csrf middleware disabled")
+	}
+
 	if cs.BodyLimit != "" {
 		e.Use(middleware.BodyLimit(cs.BodyLimit))
 
-		xlog.Warn("Body limit is: %v", cs.BodyLimit)
+		xlog.Warn("body limit is: %v", cs.BodyLimit)
 	} else {
-		xlog.Warn("Body limit is empty")
+		xlog.Warn("body limit is empty")
 	}
 
 	if len(cs.AllowOrigins) > 0 {
@@ -239,7 +251,7 @@ func initContentSecurity(e *echo.Echo, appService service.AppService) {
 			AllowOrigins: cs.AllowOrigins,
 		}))
 
-		xlog.Info("Allow origins: %v", cs.AllowOrigins)
+		xlog.Info("allow origins: %v", cs.AllowOrigins)
 	}
 
 	{
@@ -262,7 +274,7 @@ func initContentSecurity(e *echo.Echo, appService service.AppService) {
 					h.Del(v)
 				}
 			})
-			xlog.Info("Headers del: %v", headersDel)
+			xlog.Info("headers del: %v", headersDel)
 		}
 		if len(headersAdd) > 0 {
 			handlers = append(handlers, func(r *echo.Response) {
@@ -271,7 +283,7 @@ func initContentSecurity(e *echo.Echo, appService service.AppService) {
 					h.Add(v[0], v[1])
 				}
 			})
-			xlog.Info("Headers add: %v", headersAdd)
+			xlog.Info("headers add: %v", headersAdd)
 		}
 		if contentPolicy != "" {
 			handlers = append(handlers, func(r *echo.Response) {
@@ -281,7 +293,7 @@ func initContentSecurity(e *echo.Echo, appService service.AppService) {
 					h.Add(echo.HeaderContentSecurityPolicy, contentPolicy)
 				}
 			})
-			xlog.Info("Content policy: %v", contentPolicy)
+			xlog.Info("content policy: %v", contentPolicy)
 		}
 
 		if len(handlers) > 0 {
@@ -331,6 +343,96 @@ func initContentSecurity(e *echo.Echo, appService service.AppService) {
 	// })
 
 }
+
+// MiddlewareFunc to add a header if the request path ends with /status
+func csrfAddHeaderMiddleware(_ service.AppService) echo.MiddlewareFunc {
+
+	anyAuthStatusReq := func(c echo.Context) bool {
+		// Check if the request path contains `/assets/` and follows the pattern `/*/assets/*`
+		path := c.Request().URL.Path // c.Path() return pattern like /blog/*
+		return c.Request().Method == http.MethodGet &&
+			consts.PathAuthStatusAPI == path
+		// strings.HasSuffix(path, "/status")
+	}
+
+	csrfAddHeader := func(c echo.Context) {
+		csrf, _ := c.Get("_csrf").(string)
+		if csrf != "" {
+			c.Response().Header().Set("X-CSRF-Token", csrf)
+		}
+	}
+
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			// Check if the request path ends with "/status"
+			if anyAuthStatusReq(c) {
+				// Add header
+				csrfAddHeader(c)
+			}
+			// Continue to the next handler
+			return next(c)
+		}
+	}
+}
+
+// csrfAddCookieAndValidateMiddleware adds CSRF cookies for `/status` requests
+// and validates CSRF tokens for unsafe methods.
+func csrfAddCookieAndValidateMiddleware(_ service.AppService) echo.MiddlewareFunc {
+
+	//
+
+	anyAuthStatusReq := func(c echo.Context) bool {
+		// Check if the request path contains `/assets/` and follows the pattern `/*/assets/*`
+		path := c.Request().URL.Path // c.Path() return pattern like /blog/*
+		return c.Request().Method == http.MethodGet &&
+			consts.PathAuthStatusAPI == path
+		// strings.HasSuffix(path, "/status")
+	}
+
+	// Check if the HTTP method is "safe".
+	isSafeMethod := func(c echo.Context) bool {
+		switch c.Request().Method {
+		case http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodTrace:
+			return true
+		}
+		return false
+	}
+
+	anyAssetsReq := func(c echo.Context) bool {
+		// Check if the request path contains `/assets/` and follows the pattern `/*/assets/*`
+		path := c.Request().URL.Path // c.Path() return pattern like /blog/*
+		return strings.Contains(path, "/assets/")
+
+	}
+
+	// Skipper logic for excluding middleware on certain requests.
+	skipper := func(c echo.Context) bool {
+		if anyAssetsReq(c) {
+			return true // Skip middleware for `/assets/` requests.
+		}
+		if isSafeMethod(c) && !anyAuthStatusReq(c) {
+			return true // Skip middleware for safe methods except `/status`.
+		}
+		return false // Do not skip middleware for other cases.
+	}
+
+	csrfConfig := middleware.CSRFConfig{
+		Skipper: skipper,
+
+		TokenLookup: "header:X-CSRF-Token,form:_csrf",
+		CookiePath:  "/",
+		// CookieDomain:   "example.com",
+		// CookieSecure:   true, // https only
+		CookieHTTPOnly: true,
+		CookieName:     "_csrf",
+		ContextKey:     "_csrf",
+		CookieSameSite: http.SameSiteDefaultMode,
+	}
+
+	return middleware.CSRFWithConfig(csrfConfig)
+
+}
+
 func initRateLimit(e *echo.Echo, appService service.AppService) {
 	// TODO for public use (rate limit, cache, headers time out)
 
@@ -346,7 +448,7 @@ func initRateLimit(e *echo.Echo, appService service.AppService) {
 			ExpiresIn: 60 * time.Second,
 		}
 
-		xlog.Info("Starting rate control, store config: %v", rateStoreConfig)
+		xlog.Info("starting rate control, store config: %v", rateStoreConfig)
 
 		rateLimiterConfig := middleware.RateLimiterConfig{
 
@@ -372,7 +474,7 @@ func initRateLimit(e *echo.Echo, appService service.AppService) {
 
 		e.Use(middleware.RateLimiterWithConfig(rateLimiterConfig))
 	} else {
-		xlog.Warn("Rate limit not active")
+		xlog.Warn("rate limit not active")
 	}
 }
 
@@ -407,7 +509,7 @@ func initProxy(e *echo.Echo, appService service.AppService) {
 
 			trg, err := newProxyUpstream(upstream)
 			if err != nil {
-				xlog.Panic("Error on try add proxy upstream: %v", err)
+				xlog.Panic("error on try add proxy upstream: %v", err)
 			}
 
 			{
@@ -415,7 +517,7 @@ func initProxy(e *echo.Echo, appService service.AppService) {
 				balancer := middleware.NewRoundRobinBalancer([]*middleware.ProxyTarget{})
 
 				for _, v := range trg.server {
-					xlog.Info("Adding proxy upstream: %v => %v", trg.prefix, v)
+					xlog.Info("adding proxy upstream: %v => %v", trg.prefix, v)
 					serverURL, err := url.Parse(v) // downstream
 					if err != nil {
 						panic(fmt.Errorf("error on parse proxy upstream %v: %v", upstream, err))
@@ -431,6 +533,7 @@ func initProxy(e *echo.Echo, appService service.AppService) {
 				proxyConfig.Balancer = balancer
 				// proxyConfig.RetryCount = 0 // 0, meaning requests are never retried
 				proxyConfig.RetryCount = len(trg.server) - 1
+				proxyConfig.Rewrite = trg.rewrite
 				proxyConfig.ErrorHandler = func(c echo.Context, err error) error {
 					return err
 				}
@@ -447,8 +550,9 @@ func initProxy(e *echo.Echo, appService service.AppService) {
 }
 
 type proxyUpstream struct {
-	server []string
-	prefix string
+	server  []string
+	prefix  string
+	rewrite map[string]string
 }
 
 func newProxyUpstream(upstream string) (*proxyUpstream, error) {
@@ -478,6 +582,31 @@ func newProxyUpstream(upstream string) (*proxyUpstream, error) {
 			r.server = append(r.server,
 				fmt.Sprintf("%s://%s", parsedURL.Scheme, v /*has port*/),
 			)
+		}
+	}
+
+	{
+		rewrite := args["rewrite"]
+
+		if len(rewrite) > 0 {
+			xlog.Info("rewrite path conds: %+v", rewrite)
+		}
+
+		for _, v := range rewrite {
+			parts := strings.SplitN(v, ":", 2)
+			if len(parts) != 2 {
+				xlog.Error("[ERROR] cannot parse token for rewrite: %s", v)
+				continue // may be panic
+			}
+
+			if len(r.rewrite) == 0 {
+				r.rewrite = map[string]string{}
+			}
+			r.rewrite[parts[0]] = parts[1]
+		}
+
+		if len(rewrite) > 0 {
+			xlog.Info("rewrite path map:%+v", r.rewrite)
 		}
 	}
 

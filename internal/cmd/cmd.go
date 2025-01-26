@@ -53,7 +53,7 @@ func (x *Command) Exec() {
 
 	defer func() {
 
-		xlog.Info("Bye")
+		xlog.Info("bye")
 	}()
 
 	x.startWithGracefulShutdown()
@@ -75,7 +75,7 @@ func applyServerTLS(s *http.Server, c *config.AppConfig) {
 		}
 		cfg.ClientSessionCache = tls.NewLRUClientSessionCache(sessionCacheSize)
 
-		xlog.Info("Enabled TLS session cache: size: %v", sessionCacheSize)
+		xlog.Info("enabled TLS session cache: size: %v", sessionCacheSize)
 	}
 
 	if sessionTickets {
@@ -88,14 +88,14 @@ func applyServerTLS(s *http.Server, c *config.AppConfig) {
 				var newKey [32]byte
 				_, err := rand.Read(newKey[:])
 				if err != nil {
-					xlog.Error("Failed to generate session ticket key: %v", err)
+					xlog.Error("failed to generate session ticket key: %v", err)
 				} else {
 					cfg.SetSessionTicketKeys([][32]byte{newKey}) // Replace the keys
 				}
 			}
 		}()
 
-		xlog.Info("Enabled TLS session tickets")
+		xlog.Info("enabled TLS session tickets")
 	}
 
 	s.TLSConfig = cfg
@@ -130,10 +130,10 @@ func (x *Command) startWithGracefulShutdown() {
 		applyServer(webDriver.TLSServer, appConfig)
 
 		serve := func(listen string) {
-			xlog.Info("Server starting: %v", listen)
+			xlog.Info("server starting: %v", listen)
 
 			defer func() {
-				xlog.Info("Server exiting")
+				xlog.Info("server exiting")
 				if r := recover(); r != nil {
 					// Log or handle the panic
 					panic(fmt.Errorf("error panic: %v", r))
@@ -154,15 +154,15 @@ func (x *Command) startWithGracefulShutdown() {
 			certHosts []string,
 		) {
 
-			xlog.Info("Server starting: %v, cert from: %v", listen, certDir)
+			xlog.Info("server starting: %v, cert from: %v", listen, certDir)
 
 			if certDir == "" {
-				xlog.Panic("Certificate dir not defined")
+				xlog.Panic("certificate dir not defined")
 				return
 			}
 
 			if len(certHosts) == 0 {
-				xlog.Panic("Certificate host not defined")
+				xlog.Panic("certificate host not defined")
 				return
 			}
 
@@ -173,17 +173,17 @@ func (x *Command) startWithGracefulShutdown() {
 
 			for _, itm := range []string{certDir, crt, key} {
 				if _, err := os.Stat(itm); os.IsNotExist(err) {
-					xlog.Panic("Path not exists : %v error: %v", itm, err)
+					xlog.Panic("path not exists : %v error: %v", itm, err)
 				}
 
-				xlog.Info("Cert path: %v", itm) // 1 2 3
+				xlog.Info("cert path: %v", itm) // 1 2 3
 			}
 
 			if err := webDriver.StartTLS(listen, crt, key); err != nil {
 				if err != http.ErrServerClosed {
 					xlog.Error("%v", err)
 				} else {
-					xlog.Info("Shutting down the server")
+					xlog.Info("shutting down the server")
 				}
 			}
 
@@ -194,17 +194,17 @@ func (x *Command) startWithGracefulShutdown() {
 			debug bool,
 		) {
 
-			xlog.Info("Server hosts: %v", certHosts)
+			xlog.Info("server hosts: %v", certHosts)
 
-			xlog.Info("Server starting with auto TLS: %v, cert from: %v", listen, certDir)
+			xlog.Info("server starting with auto TLS: %v, cert from: %v", listen, certDir)
 
 			if certDir == "" {
-				xlog.Panic("Certificate dir not defined")
+				xlog.Panic("certificate dir not defined")
 				return
 			}
 
 			if len(certHosts) == 0 {
-				xlog.Panic("Certificate host not defined")
+				xlog.Panic("certificate host not defined")
 				return
 			}
 
@@ -212,10 +212,10 @@ func (x *Command) startWithGracefulShutdown() {
 
 			for _, itm := range []string{certDir} {
 				if _, err := os.Stat(itm); os.IsNotExist(err) {
-					xlog.Panic("Path not exists : %v error: %v", itm, err)
+					xlog.Panic("path not exists : %v error: %v", itm, err)
 				}
 
-				xlog.Info("Cert path: %v", itm)
+				xlog.Info("cert path: %v", itm)
 			}
 
 			// .Email
@@ -233,7 +233,7 @@ func (x *Command) startWithGracefulShutdown() {
 				if err != http.ErrServerClosed {
 					xlog.Error("%v", err)
 				} else {
-					xlog.Info("Shutting down the server")
+					xlog.Info("shutting down the server")
 				}
 			}
 
@@ -266,11 +266,11 @@ func (x *Command) startWithGracefulShutdown() {
 
 	// Wait for interrupt signal to gracefully shutdown the server with a timeout of 10 seconds.
 	<-ctx.Done()
-	xlog.Info("Interrupt signal")
+	xlog.Info("interrupt signal")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	xlog.Info("Shutdown web driver")
+	xlog.Info("shutdown web driver")
 	if err := webDriver.Shutdown(ctx); err != nil {
-		xlog.Error("Error on shutdown server: %v", err)
+		xlog.Error("error on shutdown server: %v", err)
 	}
 }

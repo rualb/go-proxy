@@ -15,7 +15,7 @@ import (
 
 func LoadConfig(cfgPtr any, dir string, fileName string) error {
 
-	xlog.Info("Loading config from: %v", dir)
+	xlog.Info("loading config from: %v", dir)
 
 	isHTTP := strings.HasPrefix(dir, "http")
 
@@ -36,7 +36,7 @@ func LoadConfig(cfgPtr any, dir string, fileName string) error {
 	return nil
 }
 
-// FromFile errIfNotExists argument soft binding, no error if file not exists
+// fromFile errIfNotExists argument soft binding, no error if file not exists
 func fromFile(cfgPtr any, dir string, file string) error {
 
 	if file == "" {
@@ -61,7 +61,7 @@ func fromFile(cfgPtr any, dir string, file string) error {
 		return fmt.Errorf("error with file %v: %v", fullPath, err)
 	}
 
-	xlog.Info("Loading config from file: %v", fullPath)
+	xlog.Info("loading config from file: %v", fullPath)
 
 	err = fromJSON(cfgPtr, string(data))
 
@@ -90,7 +90,7 @@ func fromURL(cfgPtr any, dir string, file string) error {
 		return fmt.Errorf("invalid URL: %v", err)
 	}
 
-	// fmt.Println("Reading config from file: ", file)
+	// fmt.Println("reading config from file: ", file)
 
 	data, err := utilhttp.GetBytes(fullPath, nil, nil)
 
@@ -98,7 +98,7 @@ func fromURL(cfgPtr any, dir string, file string) error {
 		return fmt.Errorf("error with file %v: %v", fullPath, err)
 	}
 
-	xlog.Info("Loading config from file: %v", fullPath)
+	xlog.Info("loading config from file: %v", fullPath)
 
 	err = fromJSON(cfgPtr, string(data))
 	if err != nil {
@@ -115,7 +115,7 @@ func expandEnv(data string) string {
 		name := match[2 : len(match)-1] // Remove '${' and '}'
 		val := os.Getenv(name)
 		if val == "" {
-			xlog.Warn("Missing env value for: %v", match)
+			xlog.Warn("missing env value for: %v", match)
 		}
 		return val // Return the original match if not found
 	})
@@ -133,7 +133,7 @@ func expandEnv(data string) string {
 
 	// 	if val == "" {
 	// 		//
-	// 		xlog.Warn("Missing env value for: %v", s)
+	// 		xlog.Warn("missing env value for: %v", s)
 	// 	}
 
 	// 	return val

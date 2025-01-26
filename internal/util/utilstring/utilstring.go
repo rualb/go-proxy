@@ -19,9 +19,9 @@ func LocalURL(path string, args ...string) string {
 
 	if pairs > 0 {
 
-		u := url.URL{
-			Path: path,
-		}
+		u, err := url.Parse(path)
+		_ = err // log
+		
 		query := u.Query()
 		for i := 0; i < pairs; i++ {
 			k := args[i*2]

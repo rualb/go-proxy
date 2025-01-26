@@ -26,25 +26,25 @@ func mustConfigRuntime(appConfig *config.AppConfig) {
 		x := appConfig.HTTPTransport
 
 		if x.MaxIdleConns > 0 {
-			xlog.Info("Http.Transport.MaxIdleConns=%v", x.MaxIdleConns)
+			xlog.Info("set Http.Transport.MaxIdleConns=%v", x.MaxIdleConns)
 			t.MaxIdleConns = x.MaxIdleConns
 		}
 		if x.IdleConnTimeout > 0 {
-			xlog.Info("Http.Transport.IdleConnTimeout=%v", x.IdleConnTimeout)
+			xlog.Info("set Http.Transport.IdleConnTimeout=%v", x.IdleConnTimeout)
 			t.IdleConnTimeout = time.Duration(x.IdleConnTimeout) * time.Second
 		}
 		if x.MaxConnsPerHost > 0 {
-			xlog.Info("Http.Transport.MaxConnsPerHost=%v", x.MaxConnsPerHost)
+			xlog.Info("set Http.Transport.MaxConnsPerHost=%v", x.MaxConnsPerHost)
 			t.MaxConnsPerHost = x.MaxConnsPerHost
 		}
 
 		if x.MaxIdleConnsPerHost > 0 {
-			xlog.Info("Http.Transport.MaxIdleConnsPerHost=%v", x.MaxIdleConnsPerHost)
+			xlog.Info("set Http.Transport.MaxIdleConnsPerHost=%v", x.MaxIdleConnsPerHost)
 			t.MaxIdleConnsPerHost = x.MaxIdleConnsPerHost
 		}
 
 	} else {
-		xlog.Error("Cannot init http.Transport")
+		xlog.Error("cannot init http.Transport")
 	}
 }
 
@@ -52,7 +52,7 @@ func (x *defaultAppService) mustConfig() {
 
 	d, _ := os.Getwd()
 
-	xlog.Info("Current work dir: %v", d)
+	xlog.Info("current work dir: %v", d)
 
 	x.configSource = config.MustNewAppConfigSource()
 

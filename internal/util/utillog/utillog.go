@@ -47,5 +47,5 @@ func Warn(format string, v ...any) {
 }
 func Sync() {
 	// if zap
-	fmt.Print("Log sync...")
+	fmt.Print("log sync...")
 }

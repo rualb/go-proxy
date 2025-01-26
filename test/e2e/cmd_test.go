@@ -40,31 +40,36 @@ func TestCmd1(t *testing.T) {
 	config.CmdLine.Upstreams = append(config.CmdLine.Upstreams,
 		"http://127.0.0.1:10082/test2?server=127.0.0.1:10083",
 	)
+
+	config.CmdLine.Upstreams = append(config.CmdLine.Upstreams,
+		`http://127.0.0.1:10084/4?rewrite=/4:/test4`,
+	)
+
 	config.CmdLine.CertHosts = append(config.CmdLine.CertHosts,
 		"localhost",
 	)
 
-	for i := 1; i <= 3; i++ {
-		e1 := echo.New()
+	for i := 1; i <= 4; i++ {
+		upstream := echo.New()
 		pathSuffix := strconv.Itoa(i)
 		listen := "127.0.0.1:" + strconv.Itoa(10080+i)
 		if i == 3 {
 			pathSuffix = "2"
 		}
 		path := "/test" + pathSuffix
-		e1.GET(path, func(c echo.Context) error {
+		upstream.GET(path, func(c echo.Context) error {
 			return c.String(http.StatusOK, "test "+strconv.Itoa(i))
 		})
 		go func() {
 			t.Logf("Temp server on: %v%v", listen, path)
 
-			err := e1.Start(listen)
+			err := upstream.Start(listen)
 			if err != nil {
 				t.Logf("Error : %v", err)
 			}
 		}()
 
-		defer e1.Shutdown(context.TODO())
+		defer upstream.Shutdown(context.TODO())
 	}
 
 	cmd := xcmd.Command{}
@@ -81,6 +86,7 @@ func TestCmd1(t *testing.T) {
 		{title: "test1", search: "test 1", url: "http://127.0.0.1:10080/test1"},
 		{title: "test2", search: "test 2", url: "http://127.0.0.1:10080/test2"},
 		{title: "test3 (RoundRobinBalancer)", search: "test 3", url: "http://127.0.0.1:10080/test2"},
+		{title: "test4", search: "test 4", url: "http://127.0.0.1:10080/4"},
 	}
 
 	for _, itm := range urls {
@@ -98,7 +104,7 @@ func TestCmd1(t *testing.T) {
 				t.Errorf("Error on %v", itm.url)
 			} else {
 
-				xlog.Info("Test ok: %v", itm.title)
+				xlog.Info("test ok: %v", itm.title)
 				t.Logf("Test ok: %v", itm.title)
 			}
 

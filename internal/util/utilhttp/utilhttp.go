@@ -41,8 +41,7 @@ func JoinURL(baseURL string, queryParams map[string]string) (string, error) {
 }
 
 func PostJSON(baseURL string, queryParams map[string]string,
-	bodyJSON map[string]any,
-	headers map[string]string,
+	headers map[string]string, bodyJSON any,
 ) ([]byte, error) {
 	// The URL to send the POST request to
 	url, err := JoinURL(baseURL, queryParams)
@@ -53,7 +52,7 @@ func PostJSON(baseURL string, queryParams map[string]string,
 
 	var data io.Reader
 
-	if len(bodyJSON) != 0 {
+	if bodyJSON != nil {
 
 		// Convert request data to JSON
 		jsonData, err := json.Marshal(bodyJSON)
@@ -68,7 +67,7 @@ func PostJSON(baseURL string, queryParams map[string]string,
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(`Content-Type`, "application/json")
 	// Authorization
 	if len(headers) != 0 {
 		for key, value := range headers {
@@ -100,8 +99,7 @@ func PostJSON(baseURL string, queryParams map[string]string,
 }
 
 func PostFormURL(baseURL string, queryParams map[string]string,
-	bodyForm url.Values,
-	headers map[string]string,
+	headers map[string]string, bodyForm url.Values,
 ) ([]byte, error) {
 	// The URL to send the POST request to
 	url, err := JoinURL(baseURL, queryParams)
@@ -121,7 +119,7 @@ func PostFormURL(baseURL string, queryParams map[string]string,
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set(`Content-Type`, "application/x-www-form-urlencoded")
 	// req.SetBasicAuth()
 	if len(headers) != 0 {
 		for key, value := range headers {
@@ -195,4 +193,42 @@ func GetBytes(baseURL string, queryParams map[string]string,
 	}
 
 	return body, err
+}
+
+// AppendURL join like path?args[0]=args[1]&args[2]=args[3]#args[4]
+// ignore query key-value pair or fragment if is empty
+func AppendURL(path string, args ...string) string {
+
+	count := len(args)
+	pairs := count / 2
+
+	if pairs > 0 {
+
+		u, err := url.Parse(path)
+		_ = err // log
+
+		query := u.Query()
+		for i := 0; i < pairs; i++ {
+			k := args[i*2]
+			v := args[i*2+1]
+			if k != "" && v != "" {
+				query.Add(k, v) // this not keep order, internal sort by key on encode
+			}
+
+		}
+
+		u.RawQuery = query.Encode()
+
+		if count%2 == 1 {
+			v := args[count-1]
+			if v != "" {
+				u.Fragment = args[count-1]
+			}
+		}
+
+		return u.String()
+
+	}
+
+	return path
 }

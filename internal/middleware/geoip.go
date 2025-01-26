@@ -17,30 +17,30 @@ import (
 func NewGeoIP(cfg config.AppConfigGeoIP) echo.MiddlewareFunc {
 
 	if cfg.File == "" {
-		xlog.Panic("GIS data file is empty")
+		xlog.Panic("gis data file is empty")
 	}
 	filename, err := filepath.Abs(cfg.File)
 
 	if err != nil {
-		xlog.Panic("GIS data file: %v error: %v", filename, err)
+		xlog.Panic("gis data file: %v error: %v", filename, err)
 	}
 
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		xlog.Panic("GIS data file: %v error: %v", filename, err)
+		xlog.Panic("gis data file: %v error: %v", filename, err)
 	}
 
-	xlog.Info("GIS data file: %v", filename)
+	xlog.Info("gis data file: %v", filename)
 
 	handler := &gisHandler{}
 	handler.mustOpenData(filename)
 	handler.loadLists(cfg.AllowCountry, cfg.BlockCountry)
 
 	if len(cfg.AllowCountry) > 0 {
-		xlog.Info("Allow country: %v", cfg.AllowCountry)
+		xlog.Info("allow country: %v", cfg.AllowCountry)
 	}
 
 	if len(cfg.BlockCountry) > 0 {
-		xlog.Info("Block country: %v", cfg.BlockCountry)
+		xlog.Info("block country: %v", cfg.BlockCountry)
 	}
 
 	// defer handler.closeDb()
@@ -87,7 +87,7 @@ func (x *gisHandler) mustOpenData(filename string) {
 	var err error
 	x.db, err = geoip2.Open(filename)
 	if err != nil {
-		xlog.Panic("GIS data file: %v error: %v", filename, err)
+		xlog.Panic("gis data file: %v error: %v", filename, err)
 	}
 }
 
@@ -107,7 +107,7 @@ func (x *gisHandler) ipToCountry(ipStr string) string {
 	country, err := x.db.Country(ip)
 
 	if err != nil {
-		xlog.Debug("IP to country IP: %v error: %v", ipStr, err)
+		xlog.Debug("ip to country IP: %v error: %v", ipStr, err)
 	}
 
 	if country != nil {
