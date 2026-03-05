@@ -1,6 +1,6 @@
 module go-proxy
 
-go 1.23.0
+go 1.26
 
 require (
 	github.com/labstack/echo-contrib v0.17.1

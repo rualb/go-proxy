@@ -289,6 +289,7 @@ type Database struct {
 	MaxIdle   int    `json:"max_idle"`
 	IdleTime  int    `json:"idle_time"`
 	Migration bool   `json:"migration"`
+	SSL       bool   `json:"ssl"`
 }
 
 // type AppConfigLog struct {
@@ -387,15 +388,16 @@ func NewAppConfig() *AppConfig {
 		// },
 
 		DB: Database{
-			Dialect:  "postgres",
-			Host:     "localhost",
-			Port:     "5432",
-			Name:     "postgres",
-			User:     "postgres",
-			Password: "postgres",
-			MaxOpen:  0,
-			MaxIdle:  0,
-			IdleTime: 0,
+			Dialect:   "postgres",
+			Host:      "localhost",
+			Port:      "5432",
+			Name:      "postgres",
+			User:      "postgres",
+			Password:  "postgres",
+			MaxOpen:   0,
+			MaxIdle:   0,
+			IdleTime:  0,
+			Migration: true,
 		},
 
 		Redis: Database{
@@ -427,9 +429,9 @@ func NewAppConfig() *AppConfig {
 			RateLimit: 5,
 			RateBurst: 10,
 
-			Listen:    "127.0.0.1:80",
-			ListenTLS: "127.0.0.1:443",
-			CertDir:   "",
+			Listen: "127.0.0.1:80",
+			// ListenTLS: "127.0.0.1:443",
+			CertDir: "",
 
 			SysAPIKey: "",
 
@@ -519,6 +521,7 @@ func (x *AppConfig) readEnvVar() error {
 
 	reader.String(&x.HTTPServer.CertDir, "cert_dir", &CmdLine.CertDir)
 
+	reader.Bool(&x.GeoIP.Enabled, "geo_ip_enabled", nil)
 	reader.String(&x.GeoIP.File, "geo_ip_file", &CmdLine.GeoIPFile)
 
 	reader.Bool(&x.IsMaint, "is_maint", &CmdLine.IsMaint)
