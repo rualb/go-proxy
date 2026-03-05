@@ -1,0 +1,101 @@
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: true # Faster subsequent runs
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.9.0
+          args: --timeout 5m
+
+  test:
+    name: Test
+    needs: [lint]
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine # Lightweight image
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: true
+
+      - name: Wait for PostgreSQL
+        run: |
+          until pg_isready --host=localhost --port=5432 --username=postgres; do
+            echo "Waiting for PostgreSQL to be ready..."
+            sleep 1
+          done
+
+      - name: Run Tests
+        env:
+          APP_DB_USER: postgres
+          APP_DB_PASSWORD: postgres
+          APP_DB_NAME: postgres
+          APP_DB_HOST: localhost
+          APP_DB_PORT: 5432
+        run: go test ./... # go test -v -race -cover ./... # Added Race Detector and Coverage
+
+  release:
+    name: Release
+    needs: [lint, test]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    # Add this block:
+    permissions:
+      contents: write  # Needed to create the release and upload assets
+      packages: write  # Optional: only if you push docker images to GHCR
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: true
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
