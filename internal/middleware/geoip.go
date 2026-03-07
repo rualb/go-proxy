@@ -92,7 +92,7 @@ func (x *gisHandler) mustOpenData(filename string) {
 }
 
 //	func (x *gisHandler) closeDb() {
-//		if x.db == nil {
+//		if x.db != nil {
 //			x.db.Close()
 //		}
 //	}
