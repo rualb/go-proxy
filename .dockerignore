@@ -4,3 +4,15 @@ node_modules
 *.log
 tmp
 
+.git
+.gitignore
+
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+*_test.go
+.github/
+.vscode/
+.idea/
+*.md
