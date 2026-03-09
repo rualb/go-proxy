@@ -22,8 +22,8 @@ func TestCmd1(t *testing.T) {
 	// Setup Echo context
 	// github: listen tcp 127.0.0.1:80: bind: permission denied "sudo go test"
 
-	config.CmdLine.Listen = "127.0.0.1:10080"
-	config.CmdLine.ListenTLS = "127.0.0.1:10443"
+	config.CmdLine.Listen = ":10080"
+	config.CmdLine.ListenTLS = ":10443"
 
 	cwd, _ := os.Getwd() // ..go-proxy/test/e2e"
 	projectRoot, _ := utiltest.GetProjectRoot()
@@ -52,7 +52,7 @@ func TestCmd1(t *testing.T) {
 	for i := 1; i <= 4; i++ {
 		upstream := echo.New()
 		pathSuffix := strconv.Itoa(i)
-		listen := "127.0.0.1:" + strconv.Itoa(10080+i)
+		listen := ":" + strconv.Itoa(10080+i)
 		if i == 3 {
 			pathSuffix = "2"
 		}
