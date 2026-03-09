@@ -3,6 +3,8 @@ ARG APP_NAME=go-proxy
 FROM golang:1.26-alpine AS builder
 
 ARG APP_NAME
+ARG APP_VERSION
+ARG BUILD_DATE
 
 WORKDIR /build
 
@@ -13,9 +15,7 @@ RUN go mod download
 
 COPY . .
 
-RUN APP_VERSION=$(cat TAG | xargs) && \
-    BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     go build -C cmd/${APP_NAME} -o /build/app -trimpath \
     -ldflags="-s -w -X main.Version=${APP_VERSION} -X main.Date=${BUILD_DATE}"
 
