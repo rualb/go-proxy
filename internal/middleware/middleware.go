@@ -498,12 +498,11 @@ func initRequestID(e *echo.Echo, appService service.AppService) {
 	}
 
 }
-func initProxy(e *echo.Echo, appService service.AppService) {
+func initProxyUpstreams(e *echo.Echo, upstreams []string) {
 
-	appConfig := appService.Config()
 	{
 
-		for _, upstream := range appConfig.Proxy.Upstreams {
+		for _, upstream := range upstreams {
 
 			// httputil.NewSingleHostReverseProxy(serverURL)
 
@@ -523,10 +522,14 @@ func initProxy(e *echo.Echo, appService service.AppService) {
 						panic(fmt.Errorf("error on parse proxy upstream %v: %v", upstream, err))
 					}
 					// .NewRandomBalancer()
-					balancer.AddTarget(&middleware.ProxyTarget{
+					ok := balancer.AddTarget(&middleware.ProxyTarget{
 						URL:  serverURL,
 						Name: v, // !!! server ID
 					})
+
+					if !ok {
+						xlog.Warn("skipping proxy upstream: %v => %v", trg.prefix, v)
+					}
 				}
 
 				proxyConfig := middleware.DefaultProxyConfig
@@ -541,11 +544,21 @@ func initProxy(e *echo.Echo, appService service.AppService) {
 					return nil
 				}
 				funcMw := middleware.ProxyWithConfig(proxyConfig)
+				//
 				e.RouteNotFound(trg.prefix, nil, funcMw)
+
 			}
 		}
 
 	}
+}
+func initProxy(e *echo.Echo, appService service.AppService) {
+
+	appConfig := appService.Config()
+
+	upstreams := appConfig.Proxy.Upstreams
+
+	initProxyUpstreams(e, upstreams)
 
 }
 

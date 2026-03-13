@@ -8,7 +8,12 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
+
+var httpClient = &http.Client{
+	Timeout: 10 * time.Second,
+}
 
 // URLEncode encodes a string for safe inclusion in a URL query.
 func URLEncode(input string) string {
@@ -75,7 +80,7 @@ func PostJSON(baseURL string, queryParams map[string]string,
 		}
 	}
 
-	client := &http.Client{}
+	client := httpClient // http.DefaultClient // &http.Client{}
 	resp, err := client.Do(req)
 
 	if err != nil {
@@ -127,7 +132,7 @@ func PostFormURL(baseURL string, queryParams map[string]string,
 		}
 	}
 
-	client := &http.Client{}
+	client := httpClient // http.DefaultClient // &http.Client{}
 	resp, err := client.Do(req)
 
 	if err != nil {
@@ -172,7 +177,7 @@ func GetBytes(baseURL string, queryParams map[string]string,
 		}
 	}
 
-	client := &http.Client{}
+	client := httpClient // http.DefaultClient // &http.Client{}
 	resp, err := client.Do(req)
 
 	if err != nil {
